@@ -7,10 +7,11 @@ import (
 
 func TestSameNode(t *testing.T) {
 	g := New()
-	r := g.ShortestPathGuaranteed("Town", "Town")
-	if r == nil {
+	results := g.ShortestPathGuaranteed("Plains", "Plains")
+	if len(results) == 0 {
 		t.Fatal("expected path for same node")
 	}
+	r := results[0]
 	if r.TotalHops != 0 {
 		t.Errorf("expected 0 hops, got %d", r.TotalHops)
 	}
@@ -18,22 +19,22 @@ func TestSameNode(t *testing.T) {
 		t.Errorf("expected probability 1.0, got %f", r.Probability)
 	}
 
-	r2 := g.ShortestPathWeighted("Town", "Town")
-	if r2 == nil {
+	results2 := g.ShortestPathWeighted("Plains", "Plains")
+	if len(results2) == 0 {
 		t.Fatal("expected path for same node (weighted)")
 	}
-	if r2.TotalHops != 0 {
-		t.Errorf("expected 0 hops, got %d", r2.TotalHops)
+	if results2[0].TotalHops != 0 {
+		t.Errorf("expected 0 hops, got %d", results2[0].TotalHops)
 	}
 }
 
 func TestTownToGrassyFieldGuaranteed(t *testing.T) {
 	g := New()
-	r := g.ShortestPathGuaranteed("Town", "Grassy Field")
-	if r == nil {
+	results := g.ShortestPathGuaranteed("Town", "Grassy Field")
+	if len(results) == 0 {
 		t.Fatal("expected path from Town to Grassy Field")
 	}
-	// Town -> Plains -> Grassy Field = 2 hops
+	r := results[0]
 	if r.TotalHops != 2 {
 		t.Errorf("expected 2 hops, got %d", r.TotalHops)
 	}
@@ -59,11 +60,11 @@ func TestNoPathToTown(t *testing.T) {
 	g := New()
 	// Town has no inbound edges, so nothing can reach it.
 	r := g.ShortestPathGuaranteed("Plains", "Town")
-	if r != nil {
+	if len(r) > 0 {
 		t.Error("expected no guaranteed path to Town")
 	}
 	r2 := g.ShortestPathWeighted("Plains", "Town")
-	if r2 != nil {
+	if len(r2) > 0 {
 		t.Error("expected no weighted path to Town")
 	}
 }
@@ -73,17 +74,18 @@ func TestTownToSpaceNoGuaranteedPath(t *testing.T) {
 	// All edges into Space are probabilistic (0.5 or 0.33),
 	// so no guaranteed-only path to Space exists.
 	r := g.ShortestPathGuaranteed("Town", "Space")
-	if r != nil {
+	if len(r) > 0 {
 		t.Error("expected no guaranteed path to Space (all inbound edges are probabilistic)")
 	}
 }
 
 func TestTownToSpaceWeighted(t *testing.T) {
 	g := New()
-	r := g.ShortestPathWeighted("Town", "Space")
-	if r == nil {
+	results := g.ShortestPathWeighted("Town", "Space")
+	if len(results) == 0 {
 		t.Fatal("expected a weighted path from Town to Space")
 	}
+	r := results[0]
 	t.Logf("Weighted path Town->Space: %d hops, prob=%.4f, weight=%.2f", r.TotalHops, r.Probability, r.WeightedLen)
 	for i, s := range r.Steps {
 		if s.Edge != nil {
@@ -106,10 +108,11 @@ func TestTownToSpaceWeighted(t *testing.T) {
 
 func TestTownToVolcanoGuaranteed(t *testing.T) {
 	g := New()
-	r := g.ShortestPathGuaranteed("Town", "Volcano")
-	if r == nil {
+	results := g.ShortestPathGuaranteed("Town", "Volcano")
+	if len(results) == 0 {
 		t.Fatal("expected guaranteed path from Town to Volcano")
 	}
+	r := results[0]
 	if r.Probability != 1.0 {
 		t.Errorf("expected probability 1.0, got %f", r.Probability)
 	}
@@ -133,19 +136,19 @@ func TestWeightedBetterOrEqual(t *testing.T) {
 	for _, p := range pairs {
 		guar := g.ShortestPathGuaranteed(p[0], p[1])
 		weighted := g.ShortestPathWeighted(p[0], p[1])
-		if guar == nil || weighted == nil {
+		if len(guar) == 0 || len(weighted) == 0 {
 			continue
 		}
-		if weighted.WeightedLen > guar.WeightedLen+0.001 {
+		if weighted[0].WeightedLen > guar[0].WeightedLen+0.001 {
 			t.Errorf("%s->%s: weighted (%.2f) worse than guaranteed (%.2f)",
-				p[0], p[1], weighted.WeightedLen, guar.WeightedLen)
+				p[0], p[1], weighted[0].WeightedLen, guar[0].WeightedLen)
 		}
 	}
 }
 
 func TestBiomeCount(t *testing.T) {
-	if len(Biomes) != 34 {
-		t.Errorf("expected 34 biomes, got %d", len(Biomes))
+	if len(Biomes) != 33 {
+		t.Errorf("expected 33 biomes, got %d", len(Biomes))
 	}
 }
 
@@ -176,36 +179,41 @@ func TestGuaranteedEdgesSubset(t *testing.T) {
 
 func TestCyclePlains(t *testing.T) {
 	g := New()
-	// Plains -> Lake -> Swamp -> Tall Grass -> Forest -> Meadow -> Plains (6 hops, all guaranteed)
-	r := g.ShortestCycleGuaranteed("Plains")
-	if r == nil {
-		t.Fatal("expected a guaranteed cycle from Plains")
+	results := g.ShortestCycleGuaranteed("Plains")
+	if len(results) == 0 {
+		t.Fatal("expected guaranteed cycles from Plains")
 	}
-	if r.Steps[0].Biome != "Plains" || r.Steps[len(r.Steps)-1].Biome != "Plains" {
-		t.Errorf("cycle should start and end at Plains, got %s...%s",
-			r.Steps[0].Biome, r.Steps[len(r.Steps)-1].Biome)
+	// Plains has exactly 2 tied shortest guaranteed cycles (5 hops each):
+	//   Plains -> Grassy Field -> Tall Grass -> Forest -> Meadow -> Plains
+	//   Plains -> Lake -> Construction Site -> Power Plant -> Factory -> Plains
+	if len(results) != 2 {
+		t.Errorf("expected 2 tied guaranteed cycles from Plains, got %d", len(results))
 	}
-	if r.Probability != 1.0 {
-		t.Errorf("guaranteed cycle should have prob 1.0, got %f", r.Probability)
-	}
-	t.Logf("Guaranteed cycle from Plains: %d hops, weight=%.2f", r.TotalHops, r.WeightedLen)
-	for i, s := range r.Steps {
-		if s.Edge != nil {
-			t.Logf("  [%d] %s -> %s (%.0f%%)", i, s.Edge.From, s.Edge.To, s.Edge.Probability*100)
-		} else {
-			t.Logf("  [%d] %s (start)", i, s.Biome)
+	for i, r := range results {
+		if r.Steps[0].Biome != "Plains" || r.Steps[len(r.Steps)-1].Biome != "Plains" {
+			t.Errorf("cycle %d should start and end at Plains", i+1)
+		}
+		if r.Probability != 1.0 {
+			t.Errorf("cycle %d: guaranteed cycle should have prob 1.0, got %f", i+1, r.Probability)
+		}
+		t.Logf("Guaranteed cycle %d from Plains: %d hops", i+1, r.TotalHops)
+		for j, s := range r.Steps {
+			if s.Edge != nil {
+				t.Logf("  [%d] %s -> %s", j, s.Edge.From, s.Edge.To)
+			} else {
+				t.Logf("  [%d] %s (start)", j, s.Biome)
+			}
 		}
 	}
 }
 
 func TestCycleVolcano(t *testing.T) {
 	g := New()
-	// Volcano -> Beach -> Sea -> Seabed -> Cave -> Badlands -> Mountain -> Volcano
-	// or a shorter one via Seabed -> Volcano (0.33) in weighted mode.
-	r := g.ShortestCycleGuaranteed("Volcano")
-	if r == nil {
+	results := g.ShortestCycleGuaranteed("Volcano")
+	if len(results) == 0 {
 		t.Fatal("expected a guaranteed cycle from Volcano")
 	}
+	r := results[0]
 	if r.Steps[0].Biome != "Volcano" || r.Steps[len(r.Steps)-1].Biome != "Volcano" {
 		t.Error("cycle should start and end at Volcano")
 	}
@@ -219,10 +227,11 @@ func TestCycleVolcano(t *testing.T) {
 
 func TestCycleWeightedVolcano(t *testing.T) {
 	g := New()
-	r := g.ShortestCycleWeighted("Volcano")
-	if r == nil {
+	results := g.ShortestCycleWeighted("Volcano")
+	if len(results) == 0 {
 		t.Fatal("expected a weighted cycle from Volcano")
 	}
+	r := results[0]
 	t.Logf("Weighted cycle from Volcano: %d hops, prob=%.4f, weight=%.2f",
 		r.TotalHops, r.Probability, r.WeightedLen)
 	for i, s := range r.Steps {
@@ -233,9 +242,9 @@ func TestCycleWeightedVolcano(t *testing.T) {
 
 	// Weighted cycle should be no worse than guaranteed.
 	guar := g.ShortestCycleGuaranteed("Volcano")
-	if guar != nil && r.WeightedLen > guar.WeightedLen+0.001 {
+	if len(guar) > 0 && r.WeightedLen > guar[0].WeightedLen+0.001 {
 		t.Errorf("weighted cycle (%.2f) worse than guaranteed (%.2f)",
-			r.WeightedLen, guar.WeightedLen)
+			r.WeightedLen, guar[0].WeightedLen)
 	}
 }
 
@@ -243,11 +252,11 @@ func TestNoCycleTown(t *testing.T) {
 	g := New()
 	// Town has no inbound edges, so no cycle is possible.
 	r := g.ShortestCycleGuaranteed("Town")
-	if r != nil {
+	if len(r) > 0 {
 		t.Error("expected no guaranteed cycle from Town")
 	}
 	r2 := g.ShortestCycleWeighted("Town")
-	if r2 != nil {
+	if len(r2) > 0 {
 		t.Error("expected no weighted cycle from Town")
 	}
 }
@@ -256,19 +265,49 @@ func TestNoCycleSpace(t *testing.T) {
 	g := New()
 	// Space -> Ancient Ruins -> Mountain -> ... no guaranteed path back to Space.
 	r := g.ShortestCycleGuaranteed("Space")
-	if r != nil {
+	if len(r) > 0 {
 		t.Error("expected no guaranteed cycle from Space")
 	}
 	// But weighted cycle should exist via Mountain->Space (0.33) or other probabilistic edges.
 	r2 := g.ShortestCycleWeighted("Space")
-	if r2 == nil {
+	if len(r2) == 0 {
 		t.Fatal("expected a weighted cycle from Space")
 	}
 	t.Logf("Weighted cycle from Space: %d hops, prob=%.4f, weight=%.2f",
-		r2.TotalHops, r2.Probability, r2.WeightedLen)
-	for i, s := range r2.Steps {
+		r2[0].TotalHops, r2[0].Probability, r2[0].WeightedLen)
+	for i, s := range r2[0].Steps {
 		if s.Edge != nil {
 			t.Logf("  [%d] %s -> %s (%.0f%%)", i, s.Edge.From, s.Edge.To, s.Edge.Probability*100)
 		}
+	}
+}
+
+func TestMultipleGuaranteedPaths(t *testing.T) {
+	g := New()
+	// There should be multiple tied guaranteed paths for some src->dst pairs.
+	results := g.ShortestPathGuaranteed("Town", "Forest")
+	if len(results) < 2 {
+		t.Logf("Town->Forest guaranteed paths: %d", len(results))
+		for i, r := range results {
+			var biomes []string
+			for _, s := range r.Steps {
+				biomes = append(biomes, s.Biome)
+			}
+			t.Logf("  Path %d: %v", i+1, biomes)
+		}
+	}
+}
+
+func TestMultipleWeightedPaths(t *testing.T) {
+	g := New()
+	// Volcano weighted cycles should have ties.
+	results := g.ShortestCycleWeighted("Volcano")
+	t.Logf("Weighted cycles from Volcano: %d", len(results))
+	for i, r := range results {
+		var biomes []string
+		for _, s := range r.Steps {
+			biomes = append(biomes, s.Biome)
+		}
+		t.Logf("  Cycle %d (weight=%.2f): %v", i+1, r.WeightedLen, biomes)
 	}
 }

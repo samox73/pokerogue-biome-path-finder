@@ -33,8 +33,8 @@ type Model struct {
 	destList   list.Model
 	focus      focus
 
-	guaranteed *graph.PathResult
-	risky      *graph.PathResult
+	guaranteed []*graph.PathResult
+	risky      []*graph.PathResult
 	isCycle    bool
 
 	statusMsg string
@@ -150,7 +150,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) copyToClipboard() tea.Cmd {
-	if m.guaranteed == nil && m.risky == nil {
+	if len(m.guaranteed) == 0 && len(m.risky) == 0 {
 		m.statusMsg = "Nothing to copy"
 		return clearStatusAfter(2 * time.Second)
 	}

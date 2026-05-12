@@ -1,6 +1,7 @@
 package graph
 
-// Biomes is the full list of 37 PokéRogue biomes.
+// Biomes is the list of selectable PokéRogue biomes (Town excluded — it is
+// only the starting node and cannot be reached again).
 var Biomes = []string{
 	"Abyss",
 	"Ancient Ruins",
@@ -33,7 +34,6 @@ var Biomes = []string{
 	"Swamp",
 	"Tall Grass",
 	"Temple",
-	"Town",
 	"Volcano",
 	"Wasteland",
 }

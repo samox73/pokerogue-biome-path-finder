@@ -19,7 +19,7 @@ func main() {
 		guaranteed := g.ShortestCycleGuaranteed(biome)
 		risky := g.ShortestCycleWeighted(biome)
 
-		if guaranteed == nil && risky == nil {
+		if len(guaranteed) == 0 && len(risky) == 0 {
 			continue
 		}
 
@@ -95,58 +95,73 @@ func biomeLink(name string) string {
 	return fmt.Sprintf("[[biomes:%s|%s]]", biomeToSlug(name), name)
 }
 
-func formatCycleDokuWiki(guaranteed, risky *graph.PathResult, biome string) string {
-	if guaranteed == nil && risky == nil {
+func formatCycleDokuWiki(guaranteed, risky []*graph.PathResult, biome string) string {
+	if len(guaranteed) == 0 && len(risky) == 0 {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString("<WRAP centeralign>\n==== Cycles ====\n</WRAP>\n\n")
 
-	if guaranteed != nil {
-		b.WriteString("=== Guaranteed Cycle ===\n\n")
-		var biomes []string
-		for _, s := range guaranteed.Steps {
-			biomes = append(biomes, biomeLink(s.Biome))
+	if len(guaranteed) > 0 {
+		label := "Guaranteed Cycle"
+		if len(guaranteed) > 1 {
+			label += "s"
 		}
-		b.WriteString(strings.Join(biomes, " -> "))
-		b.WriteString("\n\n")
-		b.WriteString(fmt.Sprintf("**Hops:** %d\n", guaranteed.TotalHops))
+		b.WriteString(fmt.Sprintf("=== %s ===\n\n", label))
+		for i, r := range guaranteed {
+			if i > 0 {
+				b.WriteString("\n")
+			}
+			if len(guaranteed) > 1 {
+				b.WriteString(fmt.Sprintf("**#%d** ", i+1))
+			}
+			var biomes []string
+			for _, s := range r.Steps {
+				biomes = append(biomes, biomeLink(s.Biome))
+			}
+			b.WriteString(strings.Join(biomes, " -> "))
+			b.WriteString("\n\n")
+			b.WriteString(fmt.Sprintf("**Hops:** %d\n", r.TotalHops))
+		}
 	}
 
-	if risky != nil && !samePath(guaranteed, risky) {
-		if guaranteed != nil {
+	uniqueRisky := filterUniquePreview(risky, guaranteed)
+
+	if len(uniqueRisky) > 0 {
+		if len(guaranteed) > 0 {
 			b.WriteString("\n")
 		}
-		label := "Risky Cycle"
-		for _, s := range risky.Steps {
-			if s.Edge != nil && s.Edge.Probability < 1.0 {
-				goto hasRisky
-			}
-		}
-		label = "Alternative Cycle"
-	hasRisky:
+		label := riskyLabel(uniqueRisky, true)
 		b.WriteString(fmt.Sprintf("=== %s ===\n\n", label))
-		var biomes []string
-		for _, s := range risky.Steps {
-			biomes = append(biomes, biomeLink(s.Biome))
-		}
-		b.WriteString(strings.Join(biomes, " -> "))
-		b.WriteString("\n\n")
-		for _, s := range risky.Steps {
-			if s.Edge == nil {
-				continue
+		for i, r := range uniqueRisky {
+			if i > 0 {
+				b.WriteString("\n")
 			}
-			prob := s.Edge.Probability * 100
-			marker := ""
-			if s.Edge.Probability < 1.0 {
-				marker = " **!!**"
+			if len(uniqueRisky) > 1 {
+				b.WriteString(fmt.Sprintf("**#%d** ", i+1))
 			}
-			b.WriteString(fmt.Sprintf("  - %s -> %s (%.0f%%)%s\n",
-				biomeLink(s.Edge.From), biomeLink(s.Edge.To), prob, marker))
+			var biomes []string
+			for _, s := range r.Steps {
+				biomes = append(biomes, biomeLink(s.Biome))
+			}
+			b.WriteString(strings.Join(biomes, " -> "))
+			b.WriteString("\n\n")
+			for _, s := range r.Steps {
+				if s.Edge == nil {
+					continue
+				}
+				prob := s.Edge.Probability * 100
+				marker := ""
+				if s.Edge.Probability < 1.0 {
+					marker = " **!!**"
+				}
+				b.WriteString(fmt.Sprintf("  - %s -> %s (%.0f%%)%s\n",
+					biomeLink(s.Edge.From), biomeLink(s.Edge.To), prob, marker))
+			}
+			b.WriteString("\n")
+			b.WriteString(fmt.Sprintf("**Hops:** %d  **Probability:** %.1f%%  **Expected transitions:** %.2f\n",
+				r.TotalHops, r.Probability*100, r.WeightedLen))
 		}
-		b.WriteString("\n")
-		b.WriteString(fmt.Sprintf("**Hops:** %d  **Probability:** %.1f%%  **Expected transitions:** %.2f\n",
-			risky.TotalHops, risky.Probability*100, risky.WeightedLen))
 	}
 
 	return b.String()
@@ -165,6 +180,51 @@ func samePath(a, b *graph.PathResult) bool {
 		}
 	}
 	return true
+}
+
+func filterUniquePreview(candidates, exclude []*graph.PathResult) []*graph.PathResult {
+	var out []*graph.PathResult
+	for _, c := range candidates {
+		found := false
+		for _, e := range exclude {
+			if samePath(c, e) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func riskyLabel(results []*graph.PathResult, isCycle bool) string {
+	anyRisky := false
+	for _, r := range results {
+		for _, s := range r.Steps {
+			if s.Edge != nil && s.Edge.Probability < 1.0 {
+				anyRisky = true
+				break
+			}
+		}
+		if anyRisky {
+			break
+		}
+	}
+	noun := "Route"
+	if isCycle {
+		noun = "Cycle"
+	}
+	prefix := "Alternative"
+	if anyRisky {
+		prefix = "Risky"
+	}
+	label := prefix + " " + noun
+	if len(results) > 1 {
+		label += "s"
+	}
+	return label
 }
 
 // --- DokuWiki to HTML converter ---

@@ -51,8 +51,17 @@ func TestFormatCycleDokuWiki(t *testing.T) {
 	if !strings.Contains(text, "**Hops:**") {
 		t.Error("missing Hops stat")
 	}
-	// Guaranteed cycle should NOT have Probability or Expected transitions.
-	guarSection := text[:strings.Index(text, "Alternative Cycle")]
+	// Guaranteed section should NOT have Probability or Expected transitions.
+	guarIdx := strings.Index(text, "Guaranteed Cycle")
+	// Find the next === section or end of text.
+	restAfterGuar := text[guarIdx:]
+	nextSection := strings.Index(restAfterGuar[3:], "===")
+	var guarSection string
+	if nextSection >= 0 {
+		guarSection = restAfterGuar[:nextSection+3]
+	} else {
+		guarSection = restAfterGuar
+	}
 	if strings.Contains(guarSection, "Probability") {
 		t.Error("guaranteed cycle should not have Probability")
 	}
@@ -72,7 +81,7 @@ func TestFormatCycleDokuWikiRiskyOnly(t *testing.T) {
 	guaranteed := g.ShortestCycleGuaranteed("Space")
 	risky := g.ShortestCycleWeighted("Space")
 
-	if guaranteed != nil {
+	if len(guaranteed) > 0 {
 		t.Skip("Space unexpectedly has a guaranteed cycle")
 	}
 
@@ -99,8 +108,8 @@ func TestFormatCycleDokuWikiBothDifferent(t *testing.T) {
 	if !strings.Contains(text, "Guaranteed Cycle") {
 		t.Error("missing Guaranteed Cycle")
 	}
-	if !strings.Contains(text, "Risky Cycle") {
-		t.Error("missing Risky Cycle (should differ from guaranteed)")
+	if !strings.Contains(text, "Risky Cycle") && !strings.Contains(text, "Alternative Cycle") {
+		t.Error("missing Risky/Alternative Cycle (should differ from guaranteed)")
 	}
 
 	t.Log("DokuWiki output for Volcano cycles:\n" + text)
@@ -127,4 +136,25 @@ func TestFormatRoutesDokuWikiNoPath(t *testing.T) {
 	if !strings.Contains(text, "No path") {
 		t.Errorf("expected no-path message, got: %s", text)
 	}
+}
+
+func TestFormatCycleDokuWikiMultipleGuaranteed(t *testing.T) {
+	g := graph.New()
+	guaranteed := g.ShortestCycleGuaranteed("Plains")
+	risky := g.ShortestCycleWeighted("Plains")
+
+	if len(guaranteed) < 2 {
+		t.Skip("Plains doesn't have multiple guaranteed cycles")
+	}
+
+	text := formatCycleDokuWiki(guaranteed, risky, "Plains")
+	// Should show numbered results.
+	if !strings.Contains(text, "**#1**") {
+		t.Error("missing #1 numbering for multiple guaranteed cycles")
+	}
+	if !strings.Contains(text, "**#2**") {
+		t.Error("missing #2 numbering for multiple guaranteed cycles")
+	}
+
+	t.Log("DokuWiki output for Plains multiple cycles:\n" + text)
 }

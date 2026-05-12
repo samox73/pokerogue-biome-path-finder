@@ -9,8 +9,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func renderAllResults(guaranteed, risky *graph.PathResult, isCycle bool) string {
-	if guaranteed == nil && risky == nil {
+func renderAllResults(guaranteed, risky []*graph.PathResult, isCycle bool) string {
+	if len(guaranteed) == 0 && len(risky) == 0 {
 		label := "No path found between these biomes."
 		if isCycle {
 			label = "No cycle exists for this biome."
@@ -20,28 +20,53 @@ func renderAllResults(guaranteed, risky *graph.PathResult, isCycle bool) string 
 
 	var b strings.Builder
 
-	if guaranteed != nil {
+	if len(guaranteed) > 0 {
 		label := "GUARANTEED ROUTE"
 		if isCycle {
 			label = "GUARANTEED CYCLE"
 		}
+		if len(guaranteed) > 1 {
+			label += "S"
+		}
 		b.WriteString(resultTitleStyle.Render(label))
 		b.WriteString("\n\n")
-		writeGuaranteedSummary(&b, guaranteed)
+		for i, r := range guaranteed {
+			if i > 0 {
+				b.WriteString("\n\n")
+			}
+			if len(guaranteed) > 1 {
+				b.WriteString(statValueStyle.Render(fmt.Sprintf("#%d ", i+1)))
+			}
+			writeGuaranteedSummary(&b, r)
+		}
 	}
 
-	if risky != nil && !samePath(guaranteed, risky) {
-		if guaranteed != nil {
+	// Filter risky results that duplicate a guaranteed result.
+	uniqueRisky := filterUnique(risky, guaranteed)
+
+	if len(uniqueRisky) > 0 {
+		if len(guaranteed) > 0 {
 			b.WriteString("\n\n")
 		}
-		label := riskyRouteLabel(risky, isCycle)
+		label, hasRisk := riskySetLabel(uniqueRisky, isCycle)
+		if len(uniqueRisky) > 1 {
+			label += "S"
+		}
 		style := riskyTitleStyle
-		if !hasRiskyEdge(risky) {
+		if !hasRisk {
 			style = resultTitleStyle
 		}
 		b.WriteString(style.Render(strings.ToUpper(label)))
 		b.WriteString("\n\n")
-		writeRiskyDetails(&b, risky)
+		for i, r := range uniqueRisky {
+			if i > 0 {
+				b.WriteString("\n\n")
+			}
+			if len(uniqueRisky) > 1 {
+				b.WriteString(statValueStyle.Render(fmt.Sprintf("#%d ", i+1)))
+			}
+			writeRiskyDetails(&b, r)
+		}
 	}
 
 	return b.String()
@@ -105,15 +130,43 @@ func hasRiskyEdge(result *graph.PathResult) bool {
 	return false
 }
 
-func riskyRouteLabel(result *graph.PathResult, isCycle bool) string {
-	if hasRiskyEdge(result) {
-		if isCycle {
-			return "Risky Cycle"
+// riskySetLabel returns the appropriate header label and whether any result is risky.
+func riskySetLabel(results []*graph.PathResult, isCycle bool) (string, bool) {
+	anyRisky := false
+	for _, r := range results {
+		if hasRiskyEdge(r) {
+			anyRisky = true
+			break
 		}
-		return "Risky Route"
+	}
+	if anyRisky {
+		if isCycle {
+			return "Risky Cycle", true
+		}
+		return "Risky Route", true
 	}
 	if isCycle {
-		return "Alternative Cycle"
+		return "Alternative Cycle", false
 	}
-	return "Alternative Route"
+	return "Alternative Route", false
+}
+
+// filterUnique returns results from candidates that don't match any path in exclude.
+func filterUnique(candidates, exclude []*graph.PathResult) []*graph.PathResult {
+	var out []*graph.PathResult
+	for _, c := range candidates {
+		if !pathInSet(c, exclude) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func pathInSet(result *graph.PathResult, set []*graph.PathResult) bool {
+	for _, r := range set {
+		if samePath(result, r) {
+			return true
+		}
+	}
+	return false
 }
