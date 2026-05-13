@@ -108,9 +108,6 @@ func writeRiskyDetails(b *strings.Builder, result *graph.PathResult) {
 	b.WriteString("  ")
 	b.WriteString(statLabelStyle.Render("Prob: "))
 	b.WriteString(statValueStyle.Render(fmt.Sprintf("%.1f%%", result.Probability*100)))
-	b.WriteString("  ")
-	b.WriteString(statLabelStyle.Render("Expected transitions: "))
-	b.WriteString(statValueStyle.Render(fmt.Sprintf("%.2f", result.WeightedLen)))
 }
 
 func hasRiskyEdge(result *graph.PathResult) bool {

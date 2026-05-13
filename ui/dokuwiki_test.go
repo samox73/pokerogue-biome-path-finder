@@ -32,6 +32,20 @@ func TestBiomeLink(t *testing.T) {
 	}
 }
 
+func TestBiomeImageLink(t *testing.T) {
+	got := biomeImageLink("Cave")
+	want := "[[biomes:cave|{{biomes:en_cave.png?200|}}]]"
+	if got != want {
+		t.Errorf("biomeImageLink = %q, want %q", got, want)
+	}
+
+	got2 := biomeImageLink("Ice Cave")
+	want2 := "[[biomes:ice_cave|{{biomes:en_ice_cave.png?200|}}]]"
+	if got2 != want2 {
+		t.Errorf("biomeImageLink = %q, want %q", got2, want2)
+	}
+}
+
 func TestFormatCycleDokuWiki(t *testing.T) {
 	g := graph.New()
 	guaranteed := g.ShortestCycleGuaranteed("Plains")
@@ -45,11 +59,8 @@ func TestFormatCycleDokuWiki(t *testing.T) {
 	if !strings.Contains(text, "Guaranteed Cycle") {
 		t.Error("missing Guaranteed Cycle section")
 	}
-	if !strings.Contains(text, "[[biomes:plains|Plains]]") {
-		t.Error("missing Plains biome link")
-	}
-	if !strings.Contains(text, "**Hops:**") {
-		t.Error("missing Hops stat")
+	if !strings.Contains(text, "{{biomes:en_plains.png?200|}}") {
+		t.Error("missing Plains image link in route overview")
 	}
 	// Guaranteed section should NOT have Probability or Expected transitions.
 	guarIdx := strings.Index(text, "Guaranteed Cycle")
@@ -125,9 +136,6 @@ func TestFormatRoutesDokuWiki(t *testing.T) {
 
 	if !strings.Contains(text, "Guaranteed Route") {
 		t.Error("missing Guaranteed Route section")
-	}
-	if !strings.Contains(text, "**Hops:**") {
-		t.Error("missing Hops stat")
 	}
 	t.Log("DokuWiki output for Town->Volcano routes:\n" + text)
 }

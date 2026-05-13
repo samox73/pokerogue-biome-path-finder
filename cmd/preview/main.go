@@ -95,6 +95,11 @@ func biomeLink(name string) string {
 	return fmt.Sprintf("[[biomes:%s|%s]]", biomeToSlug(name), name)
 }
 
+func biomeImageLink(name string) string {
+	slug := biomeToSlug(name)
+	return fmt.Sprintf("[[biomes:%s|{{biomes:en_%s.png?200|}}]]", slug, slug)
+}
+
 func formatCycleDokuWiki(guaranteed, risky []*graph.PathResult, biome string) string {
 	if len(guaranteed) == 0 && len(risky) == 0 {
 		return ""
@@ -117,11 +122,10 @@ func formatCycleDokuWiki(guaranteed, risky []*graph.PathResult, biome string) st
 			}
 			var biomes []string
 			for _, s := range r.Steps {
-				biomes = append(biomes, biomeLink(s.Biome))
+				biomes = append(biomes, biomeImageLink(s.Biome))
 			}
 			b.WriteString(strings.Join(biomes, " -> "))
-			b.WriteString("\n\n")
-			b.WriteString(fmt.Sprintf("**Hops:** %d\n", r.TotalHops))
+			b.WriteString("\n")
 		}
 	}
 
@@ -142,7 +146,7 @@ func formatCycleDokuWiki(guaranteed, risky []*graph.PathResult, biome string) st
 			}
 			var biomes []string
 			for _, s := range r.Steps {
-				biomes = append(biomes, biomeLink(s.Biome))
+				biomes = append(biomes, biomeImageLink(s.Biome))
 			}
 			b.WriteString(strings.Join(biomes, " -> "))
 			b.WriteString("\n\n")
@@ -155,8 +159,8 @@ func formatCycleDokuWiki(guaranteed, risky []*graph.PathResult, biome string) st
 					biomeLink(s.Edge.From), biomeLink(s.Edge.To), prob))
 			}
 			b.WriteString("\n")
-			b.WriteString(fmt.Sprintf("**Hops:** %d  **Probability:** %.1f%%  **Expected transitions:** %.2f\n",
-				r.TotalHops, r.Probability*100, r.WeightedLen))
+			b.WriteString(fmt.Sprintf("**Probability:** %.1f%%\n",
+				r.Probability*100))
 		}
 	}
 
