@@ -32,6 +32,7 @@ type Model struct {
 	sourceList list.Model
 	destList   list.Model
 	focus      focus
+	locked     bool // when true, both lists scroll together (cycle mode)
 
 	guaranteed []*graph.PathResult
 	risky      []*graph.PathResult
@@ -50,25 +51,17 @@ func NewModel() Model {
 		items[i] = biomeItem(b)
 	}
 
-	srcDelegate := list.NewDefaultDelegate()
-	srcDelegate.ShowDescription = false
-	srcDelegate.SetHeight(1)
+	srcDelegate := styledDelegate()
 	srcList := list.New(items, srcDelegate, 30, 20)
 	srcList.Title = "Source"
-	srcList.SetShowStatusBar(false)
-	srcList.SetShowHelp(false)
-	srcList.DisableQuitKeybindings()
+	applyListStyles(&srcList)
 
 	destItems := make([]list.Item, len(items))
 	copy(destItems, items)
-	destDelegate := list.NewDefaultDelegate()
-	destDelegate.ShowDescription = false
-	destDelegate.SetHeight(1)
+	destDelegate := styledDelegate()
 	destList := list.New(destItems, destDelegate, 30, 20)
 	destList.Title = "Destination"
-	destList.SetShowStatusBar(false)
-	destList.SetShowHelp(false)
-	destList.DisableQuitKeybindings()
+	applyListStyles(&destList)
 
 	m := Model{
 		graph:      g,
@@ -124,22 +117,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "tab":
-			if m.focus == focusSource {
-				m.focus = focusDest
-			} else {
-				m.focus = focusSource
+			if !m.locked {
+				if m.focus == focusSource {
+					m.focus = focusDest
+				} else {
+					m.focus = focusSource
+				}
 			}
 			return m, nil
 		case "shift+tab":
-			if m.focus == focusDest {
-				m.focus = focusSource
-			} else {
-				m.focus = focusDest
+			if !m.locked {
+				if m.focus == focusDest {
+					m.focus = focusSource
+				} else {
+					m.focus = focusDest
+				}
+			}
+			return m, nil
+		case "l":
+			m.locked = !m.locked
+			if m.locked {
+				// Sync dest to match source cursor.
+				m.destList.Select(m.sourceList.Index())
+				m.recalculate()
 			}
 			return m, nil
 		case "c":
 			return m, m.copyToClipboard()
 		}
+	}
+
+	if m.locked {
+		// Forward navigation to both lists.
+		var cmd tea.Cmd
+		m.sourceList, cmd = m.sourceList.Update(msg)
+		m.destList.Select(m.sourceList.Index())
+		m.recalculate()
+		return m, cmd
 	}
 
 	l := m.activeListPtr()
@@ -235,7 +249,10 @@ func (m Model) View() string {
 
 	srcStyle := unfocusedBorderStyle
 	dstStyle := unfocusedBorderStyle
-	if m.focus == focusSource {
+	if m.locked {
+		srcStyle = focusedBorderStyle
+		dstStyle = focusedBorderStyle
+	} else if m.focus == focusSource {
 		srcStyle = focusedBorderStyle
 	} else {
 		dstStyle = focusedBorderStyle
@@ -255,7 +272,11 @@ func (m Model) View() string {
 
 	lists := lipgloss.JoinHorizontal(lipgloss.Top, srcPanel, " ", dstPanel)
 
-	help := helpStyle.Render("[tab] switch list  [/] filter  [c] copy  [q] quit")
+	lockLabel := "[l] lock lists"
+	if m.locked {
+		lockLabel = "[l] unlock lists"
+	}
+	help := helpStyle.Render("[tab] switch list  [/] filter  " + lockLabel + "  [c] copy  [q] quit")
 
 	var statusLine string
 	if m.statusMsg != "" {
@@ -277,4 +298,29 @@ func (m Model) View() string {
 	rightPanel := panelStyle.Width(rightWidth).Render(resultsContent)
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, "  ", rightPanel)
+}
+
+// styledDelegate creates a list.DefaultDelegate with our unified color scheme.
+func styledDelegate() list.DefaultDelegate {
+	d := list.NewDefaultDelegate()
+	d.ShowDescription = false
+	d.SetHeight(1)
+
+	d.Styles.NormalTitle = listNormalTitleStyle
+	d.Styles.SelectedTitle = listSelectedTitleStyle
+	d.Styles.DimmedTitle = listDimmedTitleStyle
+	d.Styles.FilterMatch = listFilterMatchStyle
+
+	return d
+}
+
+// applyListStyles configures list-level styles (title, filter prompt, etc.).
+func applyListStyles(l *list.Model) {
+	l.Styles.Title = listTitleStyle
+	l.Styles.TitleBar = listTitleBarStyle
+	l.Styles.FilterPrompt = listFilterPromptStyle
+	l.Styles.FilterCursor = listFilterCursorStyle
+	l.SetShowStatusBar(false)
+	l.SetShowHelp(false)
+	l.DisableQuitKeybindings()
 }

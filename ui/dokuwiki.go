@@ -132,15 +132,10 @@ func writeRiskyDokuWiki(b *strings.Builder, result *graph.PathResult, numbered b
 			continue
 		}
 		prob := s.Edge.Probability * 100
-		marker := ""
-		if s.Edge.Probability < 1.0 {
-			marker = " **!!**"
-		}
-		b.WriteString(fmt.Sprintf("  - %s -> %s (%.0f%%)%s\n",
+		b.WriteString(fmt.Sprintf("  - %s -> %s (%.0f%%)\n",
 			biomeLink(s.Edge.From),
 			biomeLink(s.Edge.To),
 			prob,
-			marker,
 		))
 	}
 

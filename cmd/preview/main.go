@@ -151,12 +151,8 @@ func formatCycleDokuWiki(guaranteed, risky []*graph.PathResult, biome string) st
 					continue
 				}
 				prob := s.Edge.Probability * 100
-				marker := ""
-				if s.Edge.Probability < 1.0 {
-					marker = " **!!**"
-				}
-				b.WriteString(fmt.Sprintf("  - %s -> %s (%.0f%%)%s\n",
-					biomeLink(s.Edge.From), biomeLink(s.Edge.To), prob, marker))
+				b.WriteString(fmt.Sprintf("  - %s -> %s (%.0f%%)\n",
+					biomeLink(s.Edge.From), biomeLink(s.Edge.To), prob))
 			}
 			b.WriteString("\n")
 			b.WriteString(fmt.Sprintf("**Hops:** %d  **Probability:** %.1f%%  **Expected transitions:** %.2f\n",

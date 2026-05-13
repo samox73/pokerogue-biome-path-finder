@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	"biome-path-finder/graph"
-
-	"github.com/charmbracelet/lipgloss"
 )
 
 func renderAllResults(guaranteed, risky []*graph.PathResult, isCycle bool) string {
@@ -28,7 +26,7 @@ func renderAllResults(guaranteed, risky []*graph.PathResult, isCycle bool) strin
 		if len(guaranteed) > 1 {
 			label += "S"
 		}
-		b.WriteString(resultTitleStyle.Render(label))
+		b.WriteString(sectionTitleStyle.Render(label))
 		b.WriteString("\n\n")
 		for i, r := range guaranteed {
 			if i > 0 {
@@ -48,15 +46,11 @@ func renderAllResults(guaranteed, risky []*graph.PathResult, isCycle bool) strin
 		if len(guaranteed) > 0 {
 			b.WriteString("\n\n")
 		}
-		label, hasRisk := riskySetLabel(uniqueRisky, isCycle)
+		label := riskySetLabel(uniqueRisky, isCycle)
 		if len(uniqueRisky) > 1 {
 			label += "S"
 		}
-		style := riskyTitleStyle
-		if !hasRisk {
-			style = resultTitleStyle
-		}
-		b.WriteString(style.Render(strings.ToUpper(label)))
+		b.WriteString(sectionTitleStyle.Render(strings.ToUpper(label)))
 		b.WriteString("\n\n")
 		for i, r := range uniqueRisky {
 			if i > 0 {
@@ -99,15 +93,13 @@ func writeRiskyDetails(b *strings.Builder, result *graph.PathResult) {
 		stepNum++
 		prob := s.Edge.Probability * 100
 		probStr := fmt.Sprintf("%.0f%%", prob)
-		var style lipgloss.Style
+		pStyle := probNormalStyle
 		if s.Edge.Probability < 1.0 {
-			style = riskyStyle
-			probStr = fmt.Sprintf("%.0f%% !", prob)
-		} else {
-			style = guaranteedStyle
+			pStyle = probRiskyStyle
 		}
-		b.WriteString(fmt.Sprintf("[%d] %s -> %s  %s\n",
-			stepNum, s.Edge.From, s.Edge.To, style.Render(probStr)))
+		b.WriteString(stepStyle.Render(fmt.Sprintf("[%d] %s -> %s  ", stepNum, s.Edge.From, s.Edge.To)))
+		b.WriteString(pStyle.Render(probStr))
+		b.WriteString("\n")
 	}
 
 	b.WriteString("\n")
@@ -130,8 +122,8 @@ func hasRiskyEdge(result *graph.PathResult) bool {
 	return false
 }
 
-// riskySetLabel returns the appropriate header label and whether any result is risky.
-func riskySetLabel(results []*graph.PathResult, isCycle bool) (string, bool) {
+// riskySetLabel returns the appropriate header label.
+func riskySetLabel(results []*graph.PathResult, isCycle bool) string {
 	anyRisky := false
 	for _, r := range results {
 		if hasRiskyEdge(r) {
@@ -141,14 +133,14 @@ func riskySetLabel(results []*graph.PathResult, isCycle bool) (string, bool) {
 	}
 	if anyRisky {
 		if isCycle {
-			return "Risky Cycle", true
+			return "Risky Cycle"
 		}
-		return "Risky Route", true
+		return "Risky Route"
 	}
 	if isCycle {
-		return "Alternative Cycle", false
+		return "Alternative Cycle"
 	}
-	return "Alternative Route", false
+	return "Alternative Route"
 }
 
 // filterUnique returns results from candidates that don't match any path in exclude.

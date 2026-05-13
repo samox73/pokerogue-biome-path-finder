@@ -92,8 +92,9 @@ func TestFormatCycleDokuWikiRiskyOnly(t *testing.T) {
 	if strings.Contains(text, "Guaranteed Cycle") {
 		t.Error("should not have Guaranteed Cycle section")
 	}
-	if !strings.Contains(text, "**!!**") {
-		t.Error("risky steps should be marked with !!")
+	// Risky steps should show probability percentages.
+	if !strings.Contains(text, "(33%)") {
+		t.Error("risky steps should show probability percentage")
 	}
 
 	t.Log("DokuWiki output for Space cycle:\n" + text)
